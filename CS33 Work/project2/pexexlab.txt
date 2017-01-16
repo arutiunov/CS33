@@ -1,0 +1,39 @@
+Since I completed the trace prior to the updates about the spec, I ended up tracing the function 
+with the parameters that Professor Eggert provided: emacs -batch -eval '(print (* 6997 -4398042316799 179))'
+
+At first I tried using the "nexti" instruction to complete my trace. But as I quickly learned, 
+this stepping tool actually stepped over functions to execute the next line of code. This led me to 
+a jungle of other assembly lines within functions that were not Ftimes and arith_driver. Instead, 
+I used the "stepi" command to navigate through the assembly of my emacs computation.
+
+Next, I at first struggled with keeping track of the change in values of registers from the instruction lines. 
+For example, the instruction line "mov  -0x8(%r12,%rbp,8),%rdi rdi=0xfffff00001000004" required me to 
+calculate the value of -0x8 + r12 + 8 * rbp. So, instead of going through this convoluted calculation, 
+I stepped to the next line of command using "stepi", and then used the command "i reg $rbp" to check 
+the updated value of rbp, after executing the aforementioned command. I saved a lot of time this way, 
+and it was an especially useful method for calculating the value of the domain register for a "mov" command
+and for jump commands. 
+
+One thing to note about jump instructions: I at first did not realize that not every jump instruction is actually
+executed in the code. Since jump instructions are based off whether a certain flag is set, I did not realize 
+that not every test or comparison will set the flag according to what is needed to perform the jump. The way 
+to ensure that the value for my rsp register was still correct was to once more use the "stepi" instruction and 
+check the value of rsp following the step. I specifically had to do this for lines 16, 34, and 39 in my trace. 
+
+I also at times used a hexadecimal calculator to calculate the memory address references with "mov" instructions. 
+For example, the instruction "movq $0x1,0x10(%rsp)" required me to accurately calculate what the value of 
+rsp + 0x10 is in order to reference the memory address in which the value of 0x1 is stored. 
+
+I did not use a script to extract the information. As a result, the process of logging Ftimes and arith_driver was 
+a pretty tedious process that involved a lot of copying and pasting. 
+
+Next was examining how the assembly code differs for the integer overflow handling of the function testovf. My machine 
+runs a gcc version lower than 6.2.0 (which is required to run -O2 -fsanitize=undefined and -O2 -fwrapv), so I had to 
+ask a friend to compile the function on their machine in order to examine the code. I could not quite figure out how to 
+look at the assembly code of the three different optimizations on SEASNet, which runs gcc 6.2.0.
+
+I was eventually able to execute the -O2 -frwapv optimization, which yielded a result of 1. But, I could not figure out how 
+to successfully run the code with the -O2 -fsanitize=undefined optimization due to a linker error I would get. I assume that 
+this is due to an internal function call made in the assembly language of -fsanitize=undefined. So, I had to consult the gcc
+documentation to figure out what this optimization does to get an answer. 
+

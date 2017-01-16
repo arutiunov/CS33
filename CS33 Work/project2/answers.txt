@@ -1,0 +1,58 @@
+Artiom Arutiunov
+ID: 504597668
+
+1. Explain why the instructions in the trace did not produce the correct mathematical result. Which instructions caused the problem, exactly?
+
+	The command "emacs -batch -eval '(print (* 6997 -4398042316799 179))'" yields -896,699,255,797,638,033. In fact, the correct value
+that emacs should produce is -5,508,385,274,225,025,937. Thus, we know that somewhere - since we are working with signed integers - 
+there was overflow occurring. When looking through my trace, I find three instances of the "imul" (multiplication) command. The first command, occurring relatively early on in the trace, is "imul %rdi,%rbx rbx=0x1b55" occurring at line 2645 of data.c. Here, the value of rbx is still within the bounds of what emacs allows (the maximum is 1152921504606846975). Looking at the next instruction,  "imul %rdi,%rbx rbx=0xff92ac06d5401b55", also at like 2645 of data.c, we see that the value assigned to rbx is greater than the maximum that emacs allows. This signifies that overflow has occurred. The last instruction, "imul %rdi,%rbx rbx=0xb38e48c71bd31c6f", is also a value greater than the maximum of emacs. Thus, these last two instructions in the trace did not produce the correct mathematical result. 
+
+2. Explain why the shell command emacs -batch -eval '(print most-positive-fixnum)' outputs 2305843009213693951. Where did the number 2305843009213693951 come from? Explain in terms of the Emacs source code.
+	
+Looking at the source for data.c, we see on line 3678: 
+	DEFVAR_LISP ("most-positive-fixnum", Vmost_positive_fixnum, doc: /* The largest value that is representable in a Lisp integer.  */);
+	Vmost_positive_fixnum = make_number (MOST_POSITIVE_FIXNUM);
+ 	XSYMBOL (intern_c_string ("most-positive-fixnum"))->constant = 1;
+
+The corresponding value of MOST_POSITIVE_FIXNUM can be found in the lisp.h file. On line 692 of the source for lisp.h we see the following: 
+ 	#define MOST_POSITIVE_FIXNUM (EMACS_INT_MAX >> INTTYPEBITS)
+
+This command indicates that the maximum value of EMACS_INT_MAX is right-shifted by the value of INTTYPEBITS. In Elisp, int numbers
+are represented with the 2 most significant bits serving as a bit tag and the rest of the bits serving as the actual value. The value of INTTYPEBITS is 2 because it is defined as GCTYPEBITS - 1 (which yields 2), meaning that the value of MOST_POSITIVE_FIXNUM can be determined using the formula: 
+(2^(N-1) - 1) >> 2. The exact result is 2305843009213693951.75, but since we are dealing with ints, the answer is simply 
+2305843009213693951. This is corresponding maximum value emacs will output with the aforementioned command. 
+
+
+3. Explain why the shell command emacs -batch -eval '(print (* most-positive-fixnum most-positive-fixnum))' outputs only 1.
+	
+	The first thing to note is that the value of most-positive-fixnum is 1152921504606846975, which is represented as 0x7FFFFFFFFFFFFFF in hexadecimal notation. When multiplied with itself, we should yield the following result of 1329227995784915870597964051066650625. With overflow occurring, this should be represented as 1100000000000000000000000000000000000000000000000000000000000001 (this is the 64-bit chunk of an even larger binary number, which emacs cannot hold). 
+	The issue is that prior to returning the value of an emacs calculation, it must be converted to an Elispobject. This is done by first left-shifting the bit-value above by 2, and then right shifting back over by 2. This is because an Elispobject is represented by 62 bits for the numerical value and the leading most significant 2 bits as a tag. Thus, after the two aforementioned shifts are executed, we yield the result 
+ 
+000000000000000000000000000000000000000000000000000000000000001
+
+	which is equal to 1. 
+
+
+4. The Emacs executable was compiled with GCC's -O2 option. Suppose it had also been compiled with -fsanitize=undefined. Explain any problems the trace would run into, or if there would not be a problem explain why not.
+
+	According to Clang 4.0 documentation (http://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html), -fsanitize=undefined performs all 
+of the checks available in the -fsanitize library except for unsigned overflow. Furthermore, the default behavior of -fsanitize=undefined is to "print a verbose error report and continue execution." But, since we are dealing with overflow in the case of the 3 digits input into the emacs multiplication calculation, the program never stops executing: The Clang documentation explicitly states that "the program will continue execution after signed integer overflows, exit after the first invalid use of a null pointer, and trap after the first use of misaligned pointer." Since we are dealing only with overflow and not memory access, then the calculation will still be executed with a warning message printed and overflow occurring. Looking at the assembly code of running the calculation with -O2 -fsanitize=undefined, we see in the assembly language that there are bunch of other checks and jumps performed in the assembly because -fsanitize=undefined checks for a bunch of other potential inconsistencies in the code. As a result, although our result will not be any different from executing the calculation with just -O2, it will probably run slower due to all of the extraneous checks. This can also be attributed to the function call made to "___ubsan_handle_add_overflow", which in our case, will be called. 
+
+
+5. Similarly, discuss whether and how -fwrapv would have caused problems.
+
+	According to the GCC documentation (https://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Code-Gen-Options.html), -frwapv works in the
+following way: "This option instructs the compiler to assume that signed...overflow of...multiplication wraps around using twos-complement representation. This flag enables some optimizations and disables others." Thus, -frwapv would still produce the mathematically incorrect result because in the case of overflow it will use twos-complement representation to wrap around the maximum positive value and go into negative values. As a result, the emacs command will still yield the incorrect result. One significant drawback of using -frwapv as opposed to -fsanitize=undefined is that the user will not be able to tell whether overflow occurred or not. They would have to deduce that from the result the emacs calculation spits out. As a result, -frwapv is slightly unclear. Because -frwapv doesn't acknowledge overflow is an inconsistency, then no runtime or compilation errors will occur or be reported. 
+
+
+6. Suppose we assume -fwrapv is used. Suggest changes to how Emacs does integer multiplication that should help improve its performance. Focus on integer multiplication; don't alter the machinery Emacs uses to decide which flavor of multiplication to do.
+
+	As I mentioned in the previous question, -fwrapv does not actually check for overflow in its execution. Thus, there is no need for 
+Emacs to conduct a check for overflow during any point of the calculation. From examining the trace I did for the command 
+"emacs -batch -eval '(print (* 6997 -4398042316799 179))", there is a lot of testing and checking for overflow that occurs from the 
+-O2 optimization. There are 15 test instructions in the assembly code and 17 cmp instructions. Under the current -O2 optimization, Emacs checks for overflow as each argument is passed into the function and after every arithmetic operation is performed. By using -fwrapv, the code will run faster because a lot of these assembly instructions will be ignored. 
+
+7. How significant are the efficiency differences discussed above, in the context of Emacs execution?
+
+	For the simple arithmetic operation of multiplying three numbers, the difference in efficiency is probably not that significant.
+However, I imagine that if a function performed a large amount of arithmetic operations that could result in overflow, then the difference in performance due to efficiency would be far more notable. Since there is casting from unsigned to signed and checks for overflow happening under the standard -O2 and -O2 -fsanitize=undefined optimizations, there would be a large amount of assembly instructions dedicated to these checks prior to yielding the actual result of the arithmetic operation (which would possibly be wrong in of itself). Moreover, there may be a difference in performance if the numbers passed to perform the arithmetic operation are very large. 

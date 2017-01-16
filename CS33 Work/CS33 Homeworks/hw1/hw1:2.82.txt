@@ -1,0 +1,15 @@
+2.82: 
+
+A) This does not always yield 1. If we had x be equal to INT_MIN, then the negation of INT_MIN would still be INT_MIN, because it has no positive counterpart. As a result, the right hand of the boolean equation is not true. 
+
+B) This always yields 1. This is because shifting to the left by 4 means multiplying the sum of x and y by a constant of 16. By adding one more value of y and subtracting one value of x, we yield the same value every time as if we just did 17 * y + 15 * x. 
+
+
+C) This always yields 1. This is because individually flipping the bits of x and y and then adding one yields the same exact result if you add the digits together first and then negate them. We rewrite ~x as -x-1 and ~y as -y-1, so the entire expression yields to
+(-x-y-1). When applying the tilde to the sum of x and y, we get the same result. 
+
+
+D) This always yields 1. Since taking the different of two unsigned numbers will never overflow, we can have either a positive or a negative value on the left hand side. On the right hand side, casting the difference between y and x will yield a positive number, and assigning a negative value to it will yield the exact same number as the left hand side. 
+
+
+E) This always yields 1. Shifting to the right arithmetically makes a number smaller, and shifting that smaller number is the same as multiplying it by 4. Even with negative numbers, we still get a smaller result than the right hand side, making the expression always true. 

@@ -1,0 +1,130 @@
+Artiom Arutiunov
+ID: 504597668
+
+Homework 3
+
+Problem 3.67
+
+A) 
+
+Stack frame: 
+
+______________________________ %rbp
+??????
+______________________________ <-- %rsp + 104
+??????
+______________________________ <-- %rsp + 96
+??????
+______________________________ <-- %rsp + 88
+??????
+______________________________ <-- %rsp + 80
+??????
+______________________________ <-- %rsp + 72
+??????
+______________________________ <-- %rsp + 64
+??????
+______________________________ <-- %rsp + 56
+??????
+______________________________ <-- %rsp + 48
+??????
+______________________________ <-- %rsp + 40
+??????
+______________________________ <-- %rsp + 32
+Z
+______________________________ <-- %rsp + 24
+&Z
+______________________________ <-- %rsp + 16
+Y
+______________________________ <-- %rsp + 8
+X
+______________________________ <-- %rsp
+
+
+
+B) In C code, it passes the struct strA s. But in terms of assembly, it passes the value of the register %rdi which points to a designated 
+area in the stack corresponding to (%rsp + 64). 
+
+C) The code for process accesses the elements of structure argument s through the commands "movq 24(%rsp), %rdx",
+"movq 16(%rsp) %rcx", and "movq 8(%rsp), %rcx." Since we are calling process, we push another 8 bytes onto the stack for the result. This explains why we add a minimum constant of 8 to the stack pointer to actually access the values of struct s. 
+
+D) The actual lines that assign values to strB r are "movq %rcx, (%rdi)", "movq %rcx, 8(%rdi)", 
+and "movq %rdx, 16(%rdi)." These are the assembly lines that correspond to the region in the stack 
+marked by register %rdi for struct r. 
+
+
+E)
+
+Stack frame: 
+
+______________________________ %rbp
+??????
+______________________________ <-- %rsp + 112
+??????
+______________________________ <-- %rsp + 104
+??????
+______________________________ <-- %rsp + 96
+??????
+______________________________ <-- %rsp + 88
+Z
+______________________________ <-- %rsp + 80
+X
+______________________________ <-- %rsp + 72
+Y
+______________________________ <-- %rsp + 64
+??????
+______________________________ <-- %rsp + 56
+??????
+______________________________ <-- %rsp + 48
+??????
+______________________________ <-- %rsp + 40
+Z
+______________________________ <-- %rsp + 32
+&Z
+______________________________ <-- %rsp + 24
+Y
+______________________________ <-- %rsp + 16
+X
+______________________________ <-- %rsp + 8
+result
+______________________________ <-- %rsp
+
+
+F) There are several general principles I can discern about how structure values are passed are function arguments 
+and how they are returned as function results. In terms of how structure values are passed, it seems that 
+they are organized in the same fashion as an array: They are linearly organized on the stack by decreasing memory 
+address until all the variables of the structure are pushed onto the stack. They are then accessed by adding a constant
+to the stack pointer using the "movq" function. Furthermore, the original position of the stack pointer is saved via the command
+"leaq 64(%rsp), %rdi." The caller-saved %rdi register is then used in the assembly language of process to access the 
+variable values of the struct passed into the function. The values of a struct are returned in the form of 
+"addq" instructions that are then stored in result register %rax. 
+
+
+
+Problem 3.70
+
+union ele {
+	struct {
+		long *p;
+		long y;
+	} e1;
+	struct {
+		long x;
+		union ele *next;
+	} e2;
+};
+
+A) 
+e1.p --> offset 0 
+e1.y --> offset 8 
+e2.x --> offset 0 
+e2.next --> offset 8
+
+B) The total structure would require a total of 16 bytes. 
+
+
+C) 
+void proc (union ele *up) {
+	up->e1.p = *(up->e2.next->e1.p) - up->e2.next->e1.y;
+}
+
+

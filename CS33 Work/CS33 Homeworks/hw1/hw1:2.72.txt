@@ -1,0 +1,6 @@
+2.72:
+
+A) Since the sizeof operator returns the type size_t, the operator returns an unsigned value. Thus, when we perform the arithmetic operator maxbytes - sizeof(val), we are always going to yield a positive result, since an integer type minus an unsigned type always yields an unsigned type. Thus the expression if (maxbytes-sizeof(val) >= 0) always holds true.
+
+
+B) One way to rewrite the condition test in order to always make it work is to change it to the following: if (maxbytes >= sizeof(val)). Or maxbytes - (int)sizeof(val) >= 0. 

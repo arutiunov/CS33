@@ -1,0 +1,78 @@
+Artiom Arutiunov
+ID: 504597668
+
+-O2 ASSEMBLY: 
+LFB0:
+	xorl	%eax, %eax
+	ret
+
+-O2 -FSANITIZE ASSEMBLY: 
+LFB0:
+	movabsq	$9223372036854775807, %rdx
+	pushq	%rbp
+LCFI0:
+	pushq	%rbx
+LCFI1:
+	subq	$8, %rsp
+LCFI2:
+	movq	_big(%rip), %rbx
+	movq	%rbx, %rbp
+	addq	%rdx, %rbp
+	jo	L6
+L2:
+	cmpq	%rbp, %rbx
+	setg	%al
+	addq	$8, %rsp
+LCFI3:
+	popq	%rbx
+LCFI4:
+	popq	%rbp
+LCFI5:
+	ret
+L6:
+LCFI6:
+	leaq	Lubsan_data0(%rip), %rdi
+	movq	%rbx, %rsi
+	call	___ubsan_handle_add_overflow
+	jmp	L2
+
+-O2 -FWRAP ASSEMBLY: 
+LFB0:
+	movq	_big(%rip), %rdx
+	movabsq	$9223372036854775807, %rax
+	addq	%rdx, %rax
+	cmpq	%rax, %rdx
+	setg	%al
+	ret
+
+	The first major difference I see between the three files is that the 
+assembly code for the -O2 version has only 1 line: "xorl %eax, %eax." This is a quick way to set the result register %eax to 0 and returning its value. Conversely, the assembly code for the -FSANITIZE 
+and the -FWRAP versions are longer, for they contain conditional jumps that branch depending on whether 
+overflow occurs or not. In particular, we see that the -FSANITIZE version performs the conditional jump "jo" depending 
+on whether the overflow flag is set or not. In the case of -FWRAP, the "setg" instruction executes depending on the 
+result of the previous line's comparison. 
+	Furthermore, the return values of the three optimizations differ as well. For the -O2 optimization, the return value 
+is 0. This is because, as seen from the assembly code, "xorl"ing eax with itself will yield 0, which is then returned. In
+the case of -FRWAP, the function always returns 1. This is because -FRWAP wraps around the maximum value possible, meaning 
+that the result of the left-handed side of the boolean expression found in the program is always smaller than the right-hand
+side of LONG_MAX. As for -FSANITIZE, the compiler will print out an error warning if it detects that overflow has occurred, 
+but it will not terminate program execution. As a result, the value returned is 0 because overflow will yield a value smaller than LONG_MAX.  
+	The reason why the assembly code differs between the three optimizations is that the additional specifications 
+of optimization result in the compiler treating overflow differently. In the case of -FSANITIZE, we are telling the 
+compiler to perform all the available checks in the UndefinedBehaviorSanitizer (UBSan) behavior detector, except
+for unsigned integer overflow (which doesn't concern us because our function is dealing with the addition of the signed
+data type long). In the case of -FWRAP, we are telling the compiler to essentially "wrap" around our result using twos-
+complement representation. This is why we have the instruction of "cmpq %rax, %rdx": to determine whether %rax, which 
+holds the sum of big + LONG_MAX, is bigger than just the value of variable big. 
+	Another point to add about the differences in assembly code is that only -FSANITIZE makes a call to another function, 
+in this case being "___ubsan_handle_add_overflow." This is likely the case because the -FSANITIZE command checks for other 
+violations in the code besides overflow, and this is its explicit check to see whether signed overflow has occurred. Of course,
+this function is only called if the overflow flag is even initially set by the preceding "addq %rdx, %rbp" instruction line. 
+	To conclude, it is evident that these are three distinct optimizations to deal with and detect overflow. They each vary 
+in their efficiencies and thoroughness of probing the code for various inconsistencies. Though -O2 is the most succinct 
+of the three, it does not actually perform any arithmetic and implicitly assumes overflow occurs. -FRWAP is in the middle of the 
+three by performing basic arithmetic and performing actions based on the result of the arithmetic. -FSANITIZE is the most thorough 
+and likely the most inefficient of the three optimizations because it checks for many other problems in the code, 
+such as out-of-bounds array indexing, not returning a value at the end of a function, and integer division by zero. 
+
+
